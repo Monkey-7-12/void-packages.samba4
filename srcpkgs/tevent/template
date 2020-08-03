@@ -1,0 +1,56 @@
+# Template file for 'tevent'
+pkgname=tevent
+version=0.10.2
+revision=2
+build_style=waf3
+configure_script="./buildtools/bin/waf"
+hostmakedepends="pkg-config python3-devel docbook2x"
+makedepends="python3-devel libxslt talloc talloc-devel gettext-devel"
+short_desc="Event system based on the talloc memory management library"
+maintainer="Nýx <n.y.x@bluewin.ch>"
+license="GPL-3.0-or-later"
+homepage="https://tevent.samba.org"
+distfiles="https://www.samba.org/ftp/tevent/tevent-${version}.tar.gz"
+checksum=f8427822e5b2878fb8b28d6f50d96848734f3f3130612fb574fdd2d2148a6696
+repository=fblog/samba4/experimental
+
+configure_args="
+--prefix=/usr
+--libdir=/usr/lib
+--sysconfdir=/etc
+--localstatedir=/var
+--disable-rpath
+--disable-rpath-install
+--builtin-libraries=replace
+--bundled-libraries=NONE
+--without-gettext
+"
+
+pre_configure() {
+	if [ "$CROSS_BUILD" ]; then
+		configure_args+="
+		--cross-compile
+		--hostcc=cc
+		--cross-answers=cross.answers
+		"
+		cp ${FILESDIR}/cross.answers .
+		sed -i "s,@@XBPS_TARGET_MACHINE@@,$XBPS_TARGET_MACHINE,g" cross.answers
+	fi
+}
+
+tevent-devel_package() {
+	short_desc+=" - development files"
+	depends="${sourcepkg}>=${version}_${revision}"
+	pkg_install() {
+		vmove usr/include
+		vmove usr/lib/pkgconfig
+		vmove usr/lib/*.so
+	}
+}
+
+tevent-python3_package() {
+	short_desc+=" - python3 bindings"
+	pkg_install() {
+		vmove ${py3_sitelib}
+	}
+}

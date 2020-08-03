@@ -1,0 +1,67 @@
+# Template file for 'ldb'
+pkgname=ldb
+version=2.1.4
+revision=1
+build_style=waf3
+configure_script="./buildtools/bin/waf"
+hostmakedepends="pkg-config python3-devel docbook2x tdb-python3 tevent-python3"
+makedepends="python3-devel libxslt gettext-devel libtdb tdb-devel tdb-python3 tevent-devel tevent-python3 talloc-devel popt-devel cmocka-devel lmdb-devel"
+short_desc="An LDAP-like database from samba"
+maintainer="Nýx <n.y.x@bluewin.ch>"
+license="LGPL-3.0-or-later"
+homepage="https://www.samba.org/ldb/"
+distfiles="https://www.samba.org/ftp/pub/ldb/ldb-${version}.tar.gz"
+checksum=9e0b12ee10cbd31f920f3ce1dcd7617c558411a438faaef44c596d77b4d0bf4e
+repository=fblog/samba4/experimental
+
+shlib_provides="libldb.so.2"
+
+configure_args="
+--prefix=/usr
+--libdir=/usr/lib
+--sysconfdir=/etc
+--localstatedir=/var
+--disable-rpath
+--disable-rpath-install
+--builtin-libraries=replace
+--bundled-libraries=NONE
+--without-gettext
+"
+
+#if [ "$CROSS_BUILD" ]; then
+#hostmakedepends+=" tdb-python3 tevent-python3"
+#fi
+
+pre_configure() {
+	if [ "$CROSS_BUILD" ]; then
+		configure_args+="
+		--cross-compile
+		--hostcc=cc
+		--cross-answers=cross.answers
+		"
+		cp ${FILESDIR}/cross.answers .
+		sed -i "s,@@XBPS_TARGET_MACHINE@@,$XBPS_TARGET_MACHINE,g" cross.answers
+	fi
+}
+
+ldb-devel_package() {
+	short_desc+=" - development files"
+	depends="${sourcepkg}>=${version}_${revision}"
+	pkg_install() {
+		vmove usr/include
+		vmove usr/lib/pkgconfig
+		# vmove "usr/lib/*.so"
+		vmove "usr/lib/libpyldb*.so"
+		vmove usr/lib/libldb.so
+		vmove usr/share/man/man3
+	}
+}
+
+ldb-python3_package() {
+	short_desc+=" - python3 bindings"
+	depends="${sourcepkg}>=${version}_${revision}"
+	pkg_install() {
+		vmove ${py3_sitelib}
+		vmove usr/lib/libpyldb-util.cpython*
+	}
+}

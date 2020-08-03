@@ -1,0 +1,59 @@
+# Template file for 'talloc'
+pkgname=talloc
+version=2.3.1
+revision=1
+build_style=waf3
+configure_script="./buildtools/bin/waf"
+hostmakedepends="pkg-config python3-devel docbook2x"
+makedepends="libtirpc-devel python3-devel libxslt gettext-devel"
+short_desc="Hierarchical pool based memory allocator with destructors"
+maintainer="Nýx <n.y.x@bluewin.ch>"
+license="GPL-3.0-or-later"
+homepage="https://talloc.samba.org/"
+distfiles="http://samba.org/ftp/${pkgname}/${pkgname}-${version}.tar.gz"
+checksum=ef4822d2fdafd2be8e0cabc3ec3c806ae29b8268e932c5e9a4cd5585f37f9f77
+repository=fblog/samba4/experimental
+
+configure_args="
+--prefix=/usr
+--libdir=/usr/lib
+--sysconfdir=/etc
+--localstatedir=/var
+--disable-rpath
+--disable-rpath-install
+--builtin-libraries=replace
+--bundled-libraries=NONE
+--without-gettext
+"
+
+pre_configure() {
+	if [ "$CROSS_BUILD" ]; then
+		configure_args+="
+		--cross-compile
+		--hostcc=cc
+		--cross-answers=cross.answers
+		"
+		cp ${FILESDIR}/cross.answers .
+		sed -i "s,@@XBPS_TARGET_MACHINE@@,$XBPS_TARGET_MACHINE,g" cross.answers
+	fi
+}
+
+talloc-devel_package() {
+	short_desc+=" - development files"
+	depends="${sourcepkg}>=${version}_${revision}"
+	pkg_install() {
+		vmove usr/include
+		vmove usr/lib/pkgconfig
+		vmove usr/lib/libtalloc.so
+		vmove usr/share/man/man3
+	}
+}
+
+talloc-python3_package() {
+	short_desc+=" - python3 bindings"
+	pkg_install() {
+		vmove ${py3_sitelib}
+		#FIXME: shlibs!
+		vmove usr/lib/libpytalloc-util.cpython*
+	}
+}

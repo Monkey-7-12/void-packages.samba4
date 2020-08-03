@@ -1,0 +1,64 @@
+# Template file for 'tdb'
+pkgname=tdb
+version=1.4.3
+revision=1
+build_style=waf3
+configure_script="./buildtools/bin/waf"
+hostmakedepends="pkg-config python3-devel docbook2x"
+makedepends="python3-devel libxslt gettext-devel"
+short_desc="Trivial Database similar to GDBM but allows simultaneous commits"
+maintainer="Nýx <n.y.x@bluewin.ch>"
+license="GPL-3.0-or-later"
+homepage="https://tdb.samba.org/"
+distfiles="http://samba.org/ftp/tdb/tdb-${version}.tar.gz"
+checksum=c8058393dfa15f47e11ebd2f1d132693f0b3b3b8bf22d0201bfb305026f88a1b
+repository=fblog/samba4/experimental
+
+configure_args="
+--prefix=/usr
+--libdir=/usr/lib
+--sysconfdir=/etc
+--localstatedir=/var
+--disable-rpath
+--disable-rpath-install
+--builtin-libraries=replace
+--bundled-libraries=NONE
+--without-gettext
+"
+
+pre_configure() {
+	if [ "$CROSS_BUILD" ]; then
+		configure_args+="
+		--cross-compile
+		--hostcc=cc
+		--cross-answers=cross.answers
+		"
+		cp ${FILESDIR}/cross.answers .
+		sed -i "s,@@XBPS_TARGET_MACHINE@@,$XBPS_TARGET_MACHINE,g" cross.answers
+	fi
+}
+
+tdb-devel_package() {
+	short_desc+=" - development files"
+	depends="libtdb>=${version}_${revision}"
+	pkg_install() {
+		vmove usr/include
+		vmove usr/lib/pkgconfig
+		vmove "usr/lib/*.so"
+	}
+}
+
+tdb-python3_package() {
+	short_desc+=" - python3 bindings"
+	depends="libtdb>=${version}_${revision}"
+	pkg_install() {
+		vmove ${py3_sitelib}
+	}
+}
+
+libtdb_package() {
+	short_desc+=" - shared library"
+	pkg_install() {
+		vmove "usr/lib/*.so.*"
+	}
+}

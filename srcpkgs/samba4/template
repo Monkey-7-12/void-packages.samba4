@@ -1,0 +1,221 @@
+# Template file for 'samba4'
+pkgname=samba4
+version=4.12.5
+revision=1
+
+wrksrc=samba-${version}
+
+short_desc="SMB/CIFS file, print, and login server for Unix"
+maintainer="Nýx <n.y.x@bluewin.ch>"
+license="GPL-3.0-or-later"
+homepage="http://www.samba.org"
+distfiles="https://download.samba.org/pub/samba/stable/samba-${version}.tar.gz"
+checksum=54b41cc6378acae20dd155ba55d78ff171875c2eaa3f05f87b485d3d6891b815
+patch_args="-Np1"
+
+
+conf_files="/etc/pam.d/samba /etc/samba/smb.conf"
+
+make_dirs="/etc/samba/private 0750 root root"
+
+
+
+
+build_options="acl cups dbus avahi gamin libarchive ncurses ad_dc ads"
+build_options_default="acl cups dbus avahi gamin libarchive ncurses ads"
+
+desc_option_avahi="Enable Avahi support"
+desc_option_gamin="Enable gamin support for fam"
+desc_option_libarchive="Enable support for libarchive"
+desc_option_ncurses="Enable ncurses for building regedit"
+desc_option_ads="Enable Active Directory member Server functionality"
+desc_option_ad_dc="Enable Active Directory Domain Controller functionality"
+
+build_style=waf3
+configure_script="./buildtools/bin/waf"
+
+_idmap_modules="idmap_ad,idmap_rid,idmap_adex,idmap_hash,idmap_tdb2"
+_pdb_modules="pdb_tdbsam,pdb_ldap,pdb_ads,pdb_smbpasswd,pdb_wbc_sam,pdb_samba4"
+_auth_modules="auth_unix,auth_wbc,auth_server,auth_netlogond,auth_script,auth_samba4"
+
+configure_args="
+--enable-fhs
+--prefix=/usr
+--sbindir=/usr/bin
+--libdir=/usr/lib
+--localstatedir=/var
+--sysconfdir=/etc
+--with-privatelibdir=/usr/lib/samba
+--with-modulesdir=/usr/lib/samba
+--with-shared-modules=$_idmap_modules,$_pdb_modules,$_auth_modules
+--disable-rpath
+--disable-rpath-install
+--disable-rpath-private-install
+--with-cluster-support
+--without-systemd
+--without-gettext
+--bundled-libraries=NONE
+--builtin-libraries=NONE
+--disable-python
+--with-system-mitkrb5
+"
+# 
+#enable python after python-bindings dependencies are fixed
+
+### ??? tevent>=0.10.1 + tevent-devel>=0.10.1
+hostmakedepends="pkg-config perl python3-devel rpcsvc-proto docbook2x libtasn1-tools
+ perl-Parse-Yapp"
+makedepends="libtirpc libtirpc-devel popt-devel e2fsprogs-devel zlib-devel
+gnutls-devel gpgme-devel pam-devel tdb-devel>=1.4.3 talloc-devel>=2.3.0 tevent>=0.10.1 tevent-devel>=0.10.1
+cmocka-devel ldb-devel>=2.0.7 mit-krb5-devel"
+
+depends="ldb>=2.0.7 tdb>=1.4.2"
+
+conflicts=samba
+
+repository=fblog/samba4/experimental
+
+configure_args+=" $(vopt_with acl acl-support)"
+makedepends+=" $(vopt_if acl acl-devel)"
+
+configure_args+=" $(vopt_enable cups cups)"
+makedepends+=" $(vopt_if cups cups-devel)"
+
+makedepends+=" $(vopt_if dbus dbus-devel)"
+
+configure_args+=" $(vopt_enable avahi avahi)"
+makedepends+=" $(vopt_if avahi avahi-libs-devel) $(vopt_if avahi dbus-devel)"
+
+configure_args+=" $(vopt_with gamin fam)"
+makedepends+=" $(vopt_if gamin gamin-devel)"
+
+configure_args+=" $(vopt_with libarchive libarchive)"
+makedepends+=" $(vopt_if libarchive libarchive-devel)"
+
+configure_args+=" $(vopt_with ncurses regedit)"
+makedepends+=" $(vopt_if ncurses ncurses-devel)"
+
+if [ "$build_option_ad_dc" ]; then
+	makedepends+=" jansson-devel lmdb-devel"
+else
+	configure_args+=" --without-ad-dc --without-json"
+fi
+
+if [ "$build_option_ads" ]; then
+	configure_args+=" --with-ads --with-ldap"
+	makedepends+=" openldap"
+else
+	configure_args+=" --without-ads --without-ldap"
+fi
+
+pre_configure() {
+	if [ "$CROSS_BUILD" ]; then
+		configure_args+="
+		--cross-compile
+		--hostcc=cc
+		--cross-answers=cross.answers
+		"
+		cp ${FILESDIR}/cross.answers .
+		sed -i "s,@@XBPS_TARGET_MACHINE@@,$XBPS_TARGET_MACHINE,g" cross.answers
+	fi
+}
+
+#do_install() {
+#return 123
+#}
+
+post_install() {
+	# smb.conf
+	vinstall examples/smb.conf.default 644 etc/samba smb.conf
+
+	# Fix paths in example file
+	vsed -i ${DESTDIR}/etc/samba/smb.conf \
+			-e '/log file =/s@/usr/local/samba/var/@/var/log/samba/@' \
+			-e '/include =/s@/usr/local/samba/lib/@/etc/samba/@' \
+			-e '/path =/s@/usr/local/samba/lib/@/var/lib/samba/@' \
+			-e '/path =/s@/usr/local/samba/@/var/lib/samba/@' \
+			-e '/path =/s@/usr/spool/samba@/var/spool/samba@'
+
+	# usr/share/examples/<pkgname>
+	vsconf examples/smb.conf.default
+
+
+
+        #return 111
+	vinstall $FILESDIR/samba.pam 644 etc/pam.d samba
+
+	vmkdir etc/openldap/schema
+	vinstall examples/LDAP/README 644 etc/openldap/schema README.LDAP
+	install -m644 examples/LDAP/samba* ${DESTDIR}/etc/openldap/schema
+	install -m755 examples/LDAP/{get*,ol*} ${DESTDIR}/etc/openldap/schema
+
+	vsv nmbd
+	vsv smbd
+	vsv samba
+	vsv winbindd
+
+	# Remove tests
+	rm -rf ${DESTDIR}/usr/lib/ctdb-tests
+	rm -rf ${DESTDIR}/usr/share/ctdb/tests
+	rm -f ${DESTDIR}/usr/bin/ctdb_run_*tests
+	rm -rf ${DESTDIR}/usr/libexec/ctdb/tests
+}
+
+#@#samba-client_package() {
+#@#	short_desc+="- Samba client programs"
+#@#	pkg_install() {
+#@#		vmove usr/share/man/man1
+#@#
+#@#		# Determine which binaries are client and which are server
+#@#		# by looking at manpage suffix, and vmove the client
+#@#		# binaries.  Ugly.
+#@#		for f in "$PKGDESTDIR"/usr/share/man/man1/*.1; do
+#@#			g=$(basename "${f}" .1)
+#@#			if [ -e "${DESTDIR}/usr/bin/${g}" ]; then
+#@#				vmove usr/bin/${g}
+#@#			fi
+#@#		done
+#@#	}
+#@#}
+#@#
+#@## TODO
+#@## libsmbclient_package() {
+#@## 	short_desc+=" - The SMB client library"
+#@## 	pkg_install() {
+#@## 		vmove "usr/lib/libsmbclient.so.*"
+#@## 		vmove usr/share/man/man7/libsmbclient.7
+#@## 	}
+#@## }
+#@#
+#@## TODO: samba's libwbclient conflicts with sssd provided libwbclient
+#@#
+#@## libwbclient_package() {
+#@## 	short_desc+=" - Samba winbind client libraries"
+#@## 	pkg_install() {
+#@## 		vmove "usr/lib/libwbclient.so.*"
+#@## 		vmove usr/lib/samba/libreplace-samba4.so
+#@## 		vmove usr/lib/samba/libwinbind-client-samba4.so
+#@## 		vmove usr/share/man/man7/libwbclient.7
+#@## 	}
+#@## }
+#@#
+#@#libsamba_package() {
+#@#	short_desc+=" - Shared libraries for communication with SMB/CIFS servers"
+#@#	#TODO: how to account for private libs in subdirectory of libdir?
+#@#	# They are needed so runtime deps are correctly deduced
+#@#	pkg_install() {
+#@#		vmove "usr/lib/*.so.*"
+#@#		vmove usr/lib/samba
+#@#		vmove usr/share/man/man7/
+#@#	}
+#@#}
+#@#
+#@#samba-devel_package() {
+#@#	short_desc+=" - development files"
+#@#	depends="libsamba>=${version}_${revision}"
+#@#	pkg_install() {
+#@#		vmove usr/include
+#@#		vmove usr/lib/pkgconfig
+#@#		vmove "usr/lib/*.so"
+#@#	}
+#@#}

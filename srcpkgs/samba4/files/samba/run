@@ -1,0 +1,5 @@
+#!/bin/sh
+[ -r conf ] && . ./conf
+mkdir -p /run/samba
+export LD_LIBRARY_PATH="/usr/lib/samba:$LD_LIBRARY_PATH"
+exec samba ${OPTS}

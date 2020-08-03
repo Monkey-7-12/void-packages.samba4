@@ -1,0 +1,17 @@
+# https://gitweb.gentoo.org/repo/gentoo.git/tree/net-fs/samba/files
+
+patches="
+  samba-4.4.0-pam.patch
+  samba-4.9.2-timespec.patch
+  samba-4.13-winexe_option.patch
+  samba-4.13-vfs_snapper_configure_option.patch
+"
+test -d patches ||mkdir patches
+idx=0
+for f in $patches; do
+  ((idx++))
+  f_out=$(printf "patches/%0.3d-%s" $idx $f)
+  wget -O $f_out https://gitweb.gentoo.org/repo/gentoo.git/plain/net-fs/samba/files/$f
+done
+
+
