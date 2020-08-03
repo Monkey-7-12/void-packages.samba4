@@ -1,12 +1,13 @@
 # Template file for 'samba4'
 pkgname=samba4
 version=4.12.5
-revision=1
+revision=2
 
 wrksrc=samba-${version}
 
 short_desc="SMB/CIFS file, print, and login server for Unix"
-maintainer="Nýx <n.y.x@bluewin.ch>"
+maintainer="Monkey-7-12 <monkeyseven@fblog.ch>"
+
 license="GPL-3.0-or-later"
 homepage="http://www.samba.org"
 distfiles="https://download.samba.org/pub/samba/stable/samba-${version}.tar.gz"
@@ -62,16 +63,15 @@ configure_args="
 # 
 #enable python after python-bindings dependencies are fixed
 
-### ??? tevent>=0.10.1 + tevent-devel>=0.10.1
 hostmakedepends="pkg-config perl python3-devel rpcsvc-proto docbook2x libtasn1-tools
  perl-Parse-Yapp"
 makedepends="libtirpc libtirpc-devel popt-devel e2fsprogs-devel zlib-devel
-gnutls-devel gpgme-devel pam-devel tdb-devel>=1.4.3 talloc-devel>=2.3.0 tevent>=0.10.1 tevent-devel>=0.10.1
-cmocka-devel ldb-devel>=2.0.7 mit-krb5-devel"
+gnutls-devel gpgme-devel pam-devel tdb-devel>=1.4.3 talloc-devel>=2.3.1 tevent>=0.10.2 tevent-devel>=0.10.2
+cmocka-devel ldb-devel>=2.1.4 mit-krb5-devel"
 
-depends="ldb>=2.0.7 tdb>=1.4.2"
+depends="ldb>=2.1.4 tdb>=1.4.3"
 
-conflicts=samba
+conflicts="samba>=0"
 
 repository=fblog/samba4/experimental
 
@@ -120,10 +120,6 @@ pre_configure() {
 	fi
 }
 
-#do_install() {
-#return 123
-#}
-
 post_install() {
 	# smb.conf
 	vinstall examples/smb.conf.default 644 etc/samba smb.conf
@@ -139,6 +135,9 @@ post_install() {
 	# usr/share/examples/<pkgname>
 	vsconf examples/smb.conf.default
 
+	# ld.so.conf
+	vmkdir etc/ld.so.conf.d
+	echo "/usr/lib/samba" >${DESTDIR}/etc/ld.so.conf.d/samba4.conf
 
 
         #return 111
